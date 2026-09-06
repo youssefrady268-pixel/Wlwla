@@ -1,11 +1,266 @@
-<!DOCTYPE HTML>
-<html>
-  <head>
-    <title>text</title>
-    </head>
-  <body>
-    <h1>password and username</h1>
-    <input type="password">
-  <input type="text"> 
-  </body>
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لعبة كرة قدم 3D أونلاين</title>
+    <style>
+        body {
+            margin: 0; padding: 0; background: #111; color: #fff;
+            font-family: Tahoma, sans-serif; overflow: hidden; text-align: center;
+        }
+        .screen {
+            display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(135deg, #1b5e20, #0d3b66);
+            flex-direction: column; justify-content: center; align-items: center; z-index: 10;
+        }
+        .active { display: flex; }
+        input, select, button {
+            padding: 12px 20px; margin: 10px; font-size: 16px; border-radius: 8px; border: none; outline: none;
+        }
+        button { background: #ff9800; color: #fff; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        button:hover { background: #f57c00; }
+        
+        #game-screen { background: #000; }
+        #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+        
+        .game-ui {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            z-index: 5; display: flex; gap: 15px;
+        }
+        .game-btn {
+            background: rgba(255, 255, 255, 0.2); border: 2px solid #fff; color: white;
+            padding: 15px 25px; border-radius: 50px; font-size: 18px; backdrop-filter: blur(5px); cursor: pointer;
+        }
+        .game-btn:active { background: rgba(255, 255, 255, 0.5); }
+        #slide-btn { display: none; background: rgba(200, 0, 0, 0.5); }
+        
+        .top-hud {
+            position: absolute; top: 20px; width: 100%; display: flex;
+            justify-content: space-around; z-index: 5; font-size: 18px; font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 1. شاشة تسجيل الدخول بالاسم -->
+    <div id="login-screen" class="screen active">
+        <h1>تسجيل الدخول</h1>
+        <p>اكتب اسمك للبدء:</p>
+        <input type="text" id="username-input" placeholder="اسم اللاعب...">
+        <button onclick="login()">دخول</button>
+    </div>
+
+    <!-- 2. شاشة اختيار الفريق -->
+    <div id="team-screen" class="screen">
+        <h1>اختر فريقك المفضل</h1>
+        <select id="team-select" onchange="updatePlayersList()">
+            <option value="Al Ahly">الأهلي</option>
+            <option value="Zamalek">الزمالك</option>
+            <option value="Real Madrid">ريال مدريد</option>
+            <option value="Barcelona">برشلونة</option>
+        </select>
+        
+        <h3>اختر لاعبك الأساسي:</h3>
+        <select id="player-select">
+            <!-- سيتم تعبئتها تلقائياً بالأسماء -->
+        </select>
+        <br>
+        <button onclick="saveTeam()">تأكيد وادخل للقائمة</button>
+    </div>
+
+    <!-- 3. القائمة الرئيسية -->
+    <div id="lobby-screen" class="screen">
+        <h1 id="welcome-msg"></h1>
+        <button onclick="createRoom()">إنشاء غرفة جديدة</button>
+        <br>
+        <input type="text" id="room-code-input" placeholder="أدخل كود الغرفة...">
+        <button onclick="joinRoom()">انضمام للغرفة</button>
+    </div>
+
+    <!-- 4. شاشة اللعب 3D -->
+    <div id="game-screen" class="screen">
+        <div class="top-hud">
+            <span id="hud-player">اللاعب: -</span>
+            <span id="hud-score">0 - 0</span>
+            <span id="hud-room">الغرفة: -</span>
+        </div>
+        
+        <div id="canvas-container"></div>
+
+        <div class="game-ui">
+            <button class="game-btn" onclick="passBall()">باس (تمرير)</button>
+            <button class="game-btn" onclick="shootBall()">تسديد</button>
+            <button class="game-btn" id="slide-btn" onclick="slideTackle()">تزحلق ⚡</button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDB__8CokfC5tCtXsh2WQtEgROPIV3M-Bo",
+            authDomain: "webchat-e43af.firebaseapp.com",
+            databaseURL: "https://webchat-e43af-default-rtdb.firebaseio.com",
+            projectId: "webchat-e43af",
+            storageBucket: "webchat-e43af.appspot.com",
+            messagingSenderId: "38825818127",
+            appId: "1:38825818127:web:ee04cb91701290b8394b7a",
+            measurementId: "G-DSFHGTMBLG"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // قائمة الفرق وأسماء اللاعبين الحقيقيين لكل فريق
+        const teamPlayers = {
+            "Al Ahly": ["محمد الشناوي", "إمام عاشور", "پيرسي تاو", "حسين الشحات", "محمود كهربا", "أحمد نبيل كوكا", "محمد هاني"],
+            "Zamalek": ["محمد عواد", "احمد سيد زيزو", "عبدالله السعيد", "ناصر ماجد", "شيكابالا", "مصطفى شلبي", "حمزة المثلوثي"],
+            "Real Madrid": ["كيليان مبابي", "جود بيلينجهام", "فينيسيوس جونيور", "لوكا مودريتش", "أنطونيو روديجر", "تيبو كورتوا"],
+            "Barcelona": ["لامين يامال", "روبرت ليفاندوفسكي", "بيدري", "جافي", "رافينيا", "مارك أندريه تير شتيغن"]
+        };
+
+        let userData = {
+            name: localStorage.getItem('game_username') || '',
+            team: localStorage.getItem('game_team') || '',
+            player: localStorage.getItem('game_player') || ''
+        };
+
+        let currentRoom = null;
+        let hasBall = false;
+
+        window.onload = function() {
+            updatePlayersList();
+            if (userData.name && userData.team && userData.player) {
+                showLobby();
+            } else if (userData.name) {
+                document.getElementById('login-screen').classList.remove('active');
+                document.getElementById('team-screen').classList.add('active');
+            }
+        };
+
+        // تحديث قائمة اللاعبين حسب الفريق المختار
+        window.updatePlayersList = function() {
+            const selectedTeam = document.getElementById('team-select').value;
+            const playerSelect = document.getElementById('player-select');
+            playerSelect.innerHTML = "";
+            
+            teamPlayers[selectedTeam].forEach(player => {
+                let opt = document.createElement('option');
+                opt.value = player;
+                opt.innerHTML = player;
+                playerSelect.appendChild(opt);
+            });
+        };
+
+        window.login = function() {
+            const name = document.getElementById('username-input').value.trim();
+            if (!name) { alert('اكتب اسمك لو سمحت!'); return; }
+            userData.name = name;
+            localStorage.setItem('game_username', name);
+            document.getElementById('login-screen').classList.remove('active');
+            document.getElementById('team-screen').classList.add('active');
+        };
+
+        window.saveTeam = function() {
+            userData.team = document.getElementById('team-select').value;
+            userData.player = document.getElementById('player-select').value;
+            
+            localStorage.setItem('game_team', userData.team);
+            localStorage.setItem('game_player', userData.player);
+            showLobby();
+        };
+
+        function showLobby() {
+            document.getElementById('login-screen').classList.remove('active');
+            document.getElementById('team-screen').classList.remove('active');
+            document.getElementById('lobby-screen').classList.add('active');
+            document.getElementById('welcome-msg').innerText = `أهلاً بك يا ${userData.name} (فريق: ${userData.team} - اللاعب: ${userData.player})`;
+        }
+
+        window.createRoom = function() {
+            const roomCode = Math.random().toString(36).substring(2, 7).toUpperCase();
+            currentRoom = roomCode;
+            set(ref(db, 'rooms/' + roomCode), { host: userData.name, status: 'waiting' }).then(() => {
+                startGame(roomCode);
+            });
+        };
+
+        window.joinRoom = function() {
+            const code = document.getElementById('room-code-input').value.trim().toUpperCase();
+            if(!code) { alert('أدخل كود الغرفة!'); return; }
+            get(ref(db, 'rooms/' + code)).then((snapshot) => {
+                if (snapshot.exists()) {
+                    currentRoom = code;
+                    startGame(code);
+                } else {
+                    alert('هذه الغرفة غير موجودة!');
+                }
+            });
+        };
+
+        let scene, camera, renderer, ball;
+
+        function startGame(roomCode) {
+            document.getElementById('lobby-screen').classList.remove('active');
+            document.getElementById('game-screen').classList.add('active');
+            
+            document.getElementById('hud-player').innerText = `اللاعب: ${userData.name} | ${userData.player} (${userData.team})`;
+            document.getElementById('hud-room').innerText = `الغرفة: ${roomCode}`;
+
+            init3D();
+
+            setInterval(() => {
+                hasBall = Math.random() < 0.5;
+                document.getElementById('slide-btn').style.display = hasBall ? 'none' : 'block';
+            }, 3000);
+        }
+
+        function init3D() {
+            const container = document.getElementById('canvas-container');
+            container.innerHTML = "";
+            
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            container.appendChild(renderer.domElement);
+
+            const light = new THREE.DirectionalLight(0xffffff, 1);
+            light.position.set(0, 20, 10);
+            scene.add(light);
+            scene.add(new THREE.AmbientLight(0x404040));
+
+            const pitchGeo = new THREE.PlaneGeometry(30, 50);
+            const pitchMat = new THREE.MeshBasicMaterial({ color: 0x2e7d32 });
+            const pitch = new THREE.Mesh(pitchGeo, pitchMat);
+            pitch.rotation.x = -Math.PI / 2;
+            scene.add(pitch);
+
+            const ballGeo = new THREE.SphereGeometry(0.8, 32, 32);
+            const ballMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+            ball = new THREE.Mesh(ballGeo, ballMat);
+            ball.position.y = 0.8;
+            scene.add(ball);
+
+            camera.position.set(0, 15, 20);
+            camera.lookAt(0, 0, 0);
+
+            animate();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            ball.rotation.y += 0.01;
+            renderer.render(scene, camera);
+        }
+
+        window.passBall = function() { alert('تم تمرير الكرة!'); };
+        window.shootBall = function() { alert('تسديدة قوية نحو المرمى!'); };
+        window.slideTackle = function() { alert('انزلاق لقطع الكرة! ⚡'); };
+    </script>
+</body>
 </html>
