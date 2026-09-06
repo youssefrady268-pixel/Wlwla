@@ -5,93 +5,143 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>لعبة كرة قدم 3D أونلاين</title>
     <style>
+        * { box-sizing: border-box; user-select: none; }
         body {
-            margin: 0; padding: 0; background: #111; color: #fff;
-            font-family: Tahoma, sans-serif; overflow: hidden; text-align: center;
+            margin: 0; padding: 0; background: #05070c; color: #fff;
+            font-family: 'Segoe UI', Tahoma, sans-serif; overflow: hidden; text-align: center;
         }
         .screen {
             display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: linear-gradient(135deg, #1b5e20, #0d3b66);
+            background: radial-gradient(circle at center, #0f2b1d 0%, #050a08 100%);
             flex-direction: column; justify-content: center; align-items: center; z-index: 10;
         }
         .active { display: flex; }
-        input, select, button {
-            padding: 12px 20px; margin: 10px; font-size: 16px; border-radius: 8px; border: none; outline: none;
+        
+        .card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 40px;
+            border-radius: 24px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+            max-width: 450px;
+            width: 90%;
         }
-        button { background: #ff9800; color: #fff; font-weight: bold; cursor: pointer; transition: 0.2s; }
-        button:hover { background: #f57c00; }
+
+        h1 { margin-bottom: 20px; font-size: 28px; color: #00e676; text-shadow: 0 0 15px rgba(0,230,118,0.4); }
+        p { color: #90a4ae; font-size: 15px; margin-bottom: 15px; }
+
+        input, select {
+            width: 100%; padding: 14px 18px; margin: 10px 0; font-size: 16px;
+            background: rgba(0, 0, 0, 0.5); border: 1px solid #263238; color: #fff;
+            border-radius: 12px; outline: none; transition: 0.3s;
+        }
+        input:focus, select:focus { border-color: #00e676; box-shadow: 0 0 10px rgba(0,230,118,0.4); }
+
+        button {
+            width: 100%; padding: 14px; margin-top: 15px; font-size: 16px; font-weight: bold;
+            background: linear-gradient(135deg, #00c853, #64dd17); color: #000;
+            border-radius: 12px; border: none; cursor: pointer; transition: 0.3s;
+            box-shadow: 0 8px 20px rgba(0,200,83,0.3);
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0,200,83,0.5); }
         
         #game-screen { background: #000; }
         #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
         
         .game-ui {
-            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            position: absolute; bottom: 30px; right: 30px;
             z-index: 5; display: flex; gap: 15px;
         }
         .game-btn {
-            background: rgba(255, 255, 255, 0.2); border: 2px solid #fff; color: white;
-            padding: 15px 25px; border-radius: 50px; font-size: 18px; backdrop-filter: blur(5px); cursor: pointer;
+            background: rgba(255, 255, 255, 0.1); border: 2px solid rgba(255, 255, 255, 0.3);
+            color: white; width: 70px; height: 70px; border-radius: 50%; font-size: 14px; font-weight: bold;
+            backdrop-filter: blur(10px); cursor: pointer; transition: 0.1s;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.4);
         }
-        .game-btn:active { background: rgba(255, 255, 255, 0.5); }
-        #slide-btn { display: none; background: rgba(200, 0, 0, 0.5); }
+        .game-btn:active { background: rgba(255, 255, 255, 0.4); transform: scale(0.92); }
+        #slide-btn { display: none; background: rgba(229, 57, 53, 0.6); border-color: #ff5252; }
+
+        #joystick-base {
+            position: absolute; bottom: 30px; left: 30px; width: 130px; height: 130px;
+            background: rgba(255, 255, 255, 0.05); border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 50%; z-index: 5; backdrop-filter: blur(8px);
+            touch-action: none;
+        }
+        #joystick-stick {
+            position: absolute; top: 37px; left: 37px; width: 56px; height: 56px;
+            background: rgba(255, 255, 255, 0.4); border: 2px solid #fff;
+            border-radius: 50%; pointer-events: none;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+        }
         
         .top-hud {
             position: absolute; top: 20px; width: 100%; display: flex;
-            justify-content: space-around; z-index: 5; font-size: 18px; font-weight: bold;
+            justify-content: space-around; z-index: 5; font-size: 16px; font-weight: bold;
+            text-shadow: 0 2px 6px rgba(0,0,0,0.9); pointer-events: none;
+        }
+        .hud-badge {
+            background: rgba(0, 0, 0, 0.6); padding: 10px 22px; border-radius: 30px;
+            border: 1px solid rgba(255,255,255,0.15); backdrop-filter: blur(8px);
         }
     </style>
 </head>
 <body>
 
-    <!-- 1. شاشة تسجيل الدخول بالاسم -->
     <div id="login-screen" class="screen active">
-        <h1>تسجيل الدخول</h1>
-        <p>اكتب اسمك للبدء:</p>
-        <input type="text" id="username-input" placeholder="اسم اللاعب...">
-        <button onclick="login()">دخول</button>
+        <div class="card">
+            <h1>تسجيل الدخول</h1>
+            <p>أدخل اسمك للانطلاق في الملاعب</p>
+            <input type="text" id="username-input" placeholder="اسم اللاعب...">
+            <button onclick="login()">دخول إلى الملعب</button>
+        </div>
     </div>
 
-    <!-- 2. شاشة اختيار الفريق -->
     <div id="team-screen" class="screen">
-        <h1>اختر فريقك المفضل</h1>
-        <select id="team-select" onchange="updatePlayersList()">
-            <option value="Al Ahly">الأهلي</option>
-            <option value="Zamalek">الزمالك</option>
-            <option value="Real Madrid">ريال مدريد</option>
-            <option value="Barcelona">برشلونة</option>
-        </select>
-        
-        <h3>اختر لاعبك الأساسي:</h3>
-        <select id="player-select">
-            <!-- سيتم تعبئتها تلقائياً بالأسماء -->
-        </select>
-        <br>
-        <button onclick="saveTeam()">تأكيد وادخل للقائمة</button>
+        <div class="card">
+            <h1>اختيار الفريق</h1>
+            <select id="team-select" onchange="updatePlayersList()">
+                <option value="Al Ahly">النادي الأهلي</option>
+                <option value="Zamalek">نادي الزمالك</option>
+                <option value="Real Madrid">ريال مدريد</option>
+                <option value="Barcelona">برشلونة</option>
+            </select>
+            
+            <p style="margin-top: 15px; text-align: right;">اختر نجمك الأساسي:</p>
+            <select id="player-select"></select>
+            
+            <button onclick="saveTeam()">تأكيد الاختيار</button>
+        </div>
     </div>
 
-    <!-- 3. القائمة الرئيسية -->
     <div id="lobby-screen" class="screen">
-        <h1 id="welcome-msg"></h1>
-        <button onclick="createRoom()">إنشاء غرفة جديدة</button>
-        <br>
-        <input type="text" id="room-code-input" placeholder="أدخل كود الغرفة...">
-        <button onclick="joinRoom()">انضمام للغرفة</button>
+        <div class="card">
+            <h1 id="welcome-msg" style="font-size: 22px;"></h1>
+            <button onclick="createRoom()">إنشاء غرفة جديدة 🎮</button>
+            <div style="margin: 15px 0; color: #78909c;">أو انضم لغرفة صديق</div>
+            <input type="text" id="room-code-input" placeholder="أدخل كود الغرفة...">
+            <button onclick="joinRoom()" style="background: linear-gradient(135deg, #00b0ff, #00e5ff); color:#000;">انضمام للغرفة 🚀</button>
+        </div>
     </div>
 
-    <!-- 4. شاشة اللعب 3D -->
     <div id="game-screen" class="screen">
         <div class="top-hud">
-            <span id="hud-player">اللاعب: -</span>
-            <span id="hud-score">0 - 0</span>
-            <span id="hud-room">الغرفة: -</span>
+            <span class="hud-badge" id="hud-player">اللاعب: -</span>
+            <span class="hud-badge" id="hud-score" style="color: #00e676; font-size: 18px;">0 - 0</span>
+            <span class="hud-badge" id="hud-room">الغرفة: -</span>
         </div>
         
         <div id="canvas-container"></div>
 
+        <div id="joystick-base">
+            <div id="joystick-stick"></div>
+        </div>
+
         <div class="game-ui">
-            <button class="game-btn" onclick="passBall()">باس (تمرير)</button>
-            <button class="game-btn" onclick="shootBall()">تسديد</button>
-            <button class="game-btn" id="slide-btn" onclick="slideTackle()">تزحلق ⚡</button>
+            <button class="game-btn" onclick="passBall()">تمرير</button>
+            <button class="game-btn" onclick="shootBall()" style="background: rgba(0, 200, 83, 0.3); border-color: #00e676;">تسديد</button>
+            <button class="game-btn" id="slide-btn" onclick="slideTackle()">تزحلق</button>
         </div>
     </div>
 
@@ -115,10 +165,9 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
-        // قائمة الفرق وأسماء اللاعبين الحقيقيين لكل فريق
         const teamPlayers = {
             "Al Ahly": ["محمد الشناوي", "إمام عاشور", "پيرسي تاو", "حسين الشحات", "محمود كهربا", "أحمد نبيل كوكا", "محمد هاني"],
-            "Zamalek": ["محمد عواد", "احمد سيد زيزو", "عبدالله السعيد", "ناصر ماجد", "شيكابالا", "مصطفى شلبي", "حمزة المثلوثي"],
+            "Zamalek": ["محمد عواد", "احمد سيد زيزو", "عبدالله السعيد", "ناصر ماهر", "شيكابالا", "مصطفى شلبي", "حمزة المثلوثي"],
             "Real Madrid": ["كيليان مبابي", "جود بيلينجهام", "فينيسيوس جونيور", "لوكا مودريتش", "أنطونيو روديجر", "تيبو كورتوا"],
             "Barcelona": ["لامين يامال", "روبرت ليفاندوفسكي", "بيدري", "جافي", "رافينيا", "مارك أندريه تير شتيغن"]
         };
@@ -131,6 +180,7 @@
 
         let currentRoom = null;
         let hasBall = false;
+        let moveX = 0, moveY = 0;
 
         window.onload = function() {
             updatePlayersList();
@@ -140,14 +190,13 @@
                 document.getElementById('login-screen').classList.remove('active');
                 document.getElementById('team-screen').classList.add('active');
             }
+            initJoystick();
         };
 
-        // تحديث قائمة اللاعبين حسب الفريق المختار
         window.updatePlayersList = function() {
             const selectedTeam = document.getElementById('team-select').value;
             const playerSelect = document.getElementById('player-select');
             playerSelect.innerHTML = "";
-            
             teamPlayers[selectedTeam].forEach(player => {
                 let opt = document.createElement('option');
                 opt.value = player;
@@ -168,7 +217,6 @@
         window.saveTeam = function() {
             userData.team = document.getElementById('team-select').value;
             userData.player = document.getElementById('player-select').value;
-            
             localStorage.setItem('game_team', userData.team);
             localStorage.setItem('game_player', userData.player);
             showLobby();
@@ -178,7 +226,7 @@
             document.getElementById('login-screen').classList.remove('active');
             document.getElementById('team-screen').classList.remove('active');
             document.getElementById('lobby-screen').classList.add('active');
-            document.getElementById('welcome-msg').innerText = `أهلاً بك يا ${userData.name} (فريق: ${userData.team} - اللاعب: ${userData.player})`;
+            document.getElementById('welcome-msg').innerText = `أهلاً بك يا ${userData.name}\n(${userData.team} - ${userData.player})`;
         }
 
         window.createRoom = function() {
@@ -202,20 +250,20 @@
             });
         };
 
-        let scene, camera, renderer, ball;
+        let scene, camera, renderer, ball, playerMesh;
 
         function startGame(roomCode) {
             document.getElementById('lobby-screen').classList.remove('active');
             document.getElementById('game-screen').classList.add('active');
             
-            document.getElementById('hud-player').innerText = `اللاعب: ${userData.name} | ${userData.player} (${userData.team})`;
+            document.getElementById('hud-player').innerText = `${userData.name} (${userData.player})`;
             document.getElementById('hud-room').innerText = `الغرفة: ${roomCode}`;
 
             init3D();
 
             setInterval(() => {
                 hasBall = Math.random() < 0.5;
-                document.getElementById('slide-btn').style.display = hasBall ? 'none' : 'block';
+                document.getElementById('slide-btn').style.display = hasBall ? 'none' : 'flex';
             }, 3000);
         }
 
@@ -224,29 +272,123 @@
             container.innerHTML = "";
             
             scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            renderer = new THREE.WebGLRenderer({ antialias: true });
+            scene.background = new THREE.Color(0x0a1118); // خلفية سماء ليلية احترافية
+            
+            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
             renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             container.appendChild(renderer.domElement);
 
-            const light = new THREE.DirectionalLight(0xffffff, 1);
-            light.position.set(0, 20, 10);
-            scene.add(light);
-            scene.add(new THREE.AmbientLight(0x404040));
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
 
-            const pitchGeo = new THREE.PlaneGeometry(30, 50);
-            const pitchMat = new THREE.MeshBasicMaterial({ color: 0x2e7d32 });
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1.1);
+            dirLight.position.set(15, 35, 20);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 1024;
+            dirLight.shadow.mapSize.height = 1024;
+            scene.add(dirLight);
+
+            // إنشاء تصميم الملعب الاحترافي (Canvas Texture لتخطيط الملعب)
+            const canvasTex = document.createElement('canvas');
+            canvasTex.width = 512;
+            canvasTex.height = 1024;
+            const ctx = canvasTex.getContext('2d');
+
+            // لون النجيلة الأساسي
+            ctx.fillStyle = '#144c1e';
+            ctx.fillRect(0, 0, 512, 1024);
+
+            // تخطيط خطوط الملعب باللون الأبيض
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.lineWidth = 6;
+
+            // خطوط الملعب الخارجية
+            ctx.strokeRect(20, 20, 472, 984);
+
+            // خط المنتصف
+            ctx.beginPath();
+            ctx.moveTo(20, 512);
+            ctx.lineTo(492, 512);
+            ctx.stroke();
+
+            // دائرة المنتصف
+            ctx.beginPath();
+            ctx.arc(256, 512, 70, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // منطقة الجزاء العلوي (المرمى الأول)
+            ctx.strokeRect(120, 20, 272, 140);
+            // منطقة الجزاء السفلي (المرمى الثاني)
+            ctx.strokeRect(120, 864, 272, 140);
+
+            const pitchTexture = new THREE.CanvasTexture(canvasTex);
+            pitchTexture.wrapS = THREE.RepeatWrapping;
+            pitchTexture.wrapT = THREE.RepeatWrapping;
+
+            const pitchGeo = new THREE.PlaneGeometry(36, 64);
+            const pitchMat = new THREE.MeshStandardMaterial({ map: pitchTexture, roughness: 0.8 });
             const pitch = new THREE.Mesh(pitchGeo, pitchMat);
             pitch.rotation.x = -Math.PI / 2;
+            pitch.receiveShadow = true;
             scene.add(pitch);
 
-            const ballGeo = new THREE.SphereGeometry(0.8, 32, 32);
-            const ballMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+            // تصميم المرمى (الجون) العلوي والسفلي لشكل واقعي
+            function createGoal(zPos, rotationY) {
+                const goalGroup = new THREE.Group();
+                const postMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 });
+                
+                const postGeo = new THREE.CylinderGeometry(0.15, 0.15, 4);
+                
+                // القائم الأيمن
+                const post1 = new THREE.Mesh(postGeo, postMat);
+                post1.position.set(4, 2, 0);
+                post1.castShadow = true;
+                goalGroup.add(post1);
+
+                // القائم الأيسر
+                const post2 = new THREE.Mesh(postGeo, postMat);
+                post2.position.set(-4, 2, 0);
+                post2.castShadow = true;
+                goalGroup.add(post2);
+
+                // العارضة العلوية
+                const barGeo = new THREE.CylinderGeometry(0.15, 0.15, 8.3);
+                const bar = new THREE.Mesh(barGeo, postMat);
+                bar.rotation.z = Math.PI / 2;
+                bar.position.set(0, 4, 0);
+                bar.castShadow = true;
+                goalGroup.add(bar);
+
+                goalGroup.position.set(0, 0, zPos);
+                goalGroup.rotation.y = rotationY;
+                scene.add(goalGroup);
+            }
+
+            createGoal(-32, 0);
+            createGoal(32, 0);
+
+            // اللاعب المجسم
+            const playerGeo = new THREE.BoxGeometry(1.2, 2.2, 1.2);
+            const playerMat = new THREE.MeshStandardMaterial({ color: 0x00e676, roughness: 0.4, metalness: 0.3 });
+            playerMesh = new THREE.Mesh(playerGeo, playerMat);
+            playerMesh.position.set(0, 1.1, 0);
+            playerMesh.castShadow = true;
+            scene.add(playerMesh);
+
+            // الكرة
+            const ballGeo = new THREE.SphereGeometry(0.7, 32, 32);
+            const ballMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2, metalness: 0.1 });
             ball = new THREE.Mesh(ballGeo, ballMat);
-            ball.position.y = 0.8;
+            ball.position.set(0, 0.7, 5);
+            ball.castShadow = true;
             scene.add(ball);
 
-            camera.position.set(0, 15, 20);
+            camera.position.set(0, 18, 26);
             camera.lookAt(0, 0, 0);
 
             animate();
@@ -254,13 +396,56 @@
 
         function animate() {
             requestAnimationFrame(animate);
-            ball.rotation.y += 0.01;
+            
+            if (playerMesh) {
+                playerMesh.position.x += moveX * 0.12;
+                playerMesh.position.z += moveY * 0.12;
+            }
+
+            ball.rotation.y += 0.02;
             renderer.render(scene, camera);
         }
 
-        window.passBall = function() { alert('تم تمرير الكرة!'); };
-        window.shootBall = function() { alert('تسديدة قوية نحو المرمى!'); };
-        window.slideTackle = function() { alert('انزلاق لقطع الكرة! ⚡'); };
+        function initJoystick() {
+            const base = document.getElementById('joystick-base');
+            const stick = document.getElementById('joystick-stick');
+            let active = false;
+            let centerX, centerY;
+
+            base.addEventListener('pointerdown', (e) => {
+                active = true;
+                const rect = base.getBoundingClientRect();
+                centerX = rect.left + rect.width / 2;
+                centerY = rect.top + rect.height / 2;
+            });
+
+            window.addEventListener('pointermove', (e) => {
+                if (!active) return;
+                const dx = e.clientX - centerX;
+                const dy = e.clientY - centerY;
+                const distance = Math.min(45, Math.sqrt(dx * dx + dy * dy));
+                const angle = Math.atan2(dy, dx);
+
+                const stickX = Math.cos(angle) * distance;
+                const stickY = Math.sin(angle) * distance;
+
+                stick.style.transform = `translate(${stickX}px, ${stickY}px)`;
+                moveX = stickX / 45;
+                moveY = stickY / 45;
+            });
+
+            window.addEventListener('pointerup', () => {
+                if (!active) return;
+                active = false;
+                stick.style.transform = `translate(0px, 0px)`;
+                moveX = 0;
+                moveY = 0;
+            });
+        }
+
+        window.passBall = function() { console.log('تمرير'); };
+        window.shootBall = function() { console.log('تسديد'); };
+        window.slideTackle = function() { console.log('تزحلق'); };
     </script>
 </body>
 </html>
