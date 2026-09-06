@@ -179,8 +179,9 @@
         };
 
         let currentRoom = null;
-        let hasBall = false;
         let moveX = 0, moveY = 0;
+        let ballVelocityX = 0, ballVelocityZ = 0;
+        let isBallMoving = false;
 
         window.onload = function() {
             updatePlayersList();
@@ -260,11 +261,6 @@
             document.getElementById('hud-room').innerText = `الغرفة: ${roomCode}`;
 
             init3D();
-
-            setInterval(() => {
-                hasBall = Math.random() < 0.5;
-                document.getElementById('slide-btn').style.display = hasBall ? 'none' : 'flex';
-            }, 3000);
         }
 
         function init3D() {
@@ -272,7 +268,7 @@
             container.innerHTML = "";
             
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x0a1118); // خلفية سماء ليلية احترافية
+            scene.background = new THREE.Color(0x0a1118);
             
             camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
             
@@ -293,37 +289,29 @@
             dirLight.shadow.mapSize.height = 1024;
             scene.add(dirLight);
 
-            // إنشاء تصميم الملعب الاحترافي (Canvas Texture لتخطيط الملعب)
+            // الملعب وتخطيطه
             const canvasTex = document.createElement('canvas');
             canvasTex.width = 512;
             canvasTex.height = 1024;
             const ctx = canvasTex.getContext('2d');
 
-            // لون النجيلة الأساسي
             ctx.fillStyle = '#144c1e';
             ctx.fillRect(0, 0, 512, 1024);
 
-            // تخطيط خطوط الملعب باللون الأبيض
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
             ctx.lineWidth = 6;
-
-            // خطوط الملعب الخارجية
             ctx.strokeRect(20, 20, 472, 984);
 
-            // خط المنتصف
             ctx.beginPath();
             ctx.moveTo(20, 512);
             ctx.lineTo(492, 512);
             ctx.stroke();
 
-            // دائرة المنتصف
             ctx.beginPath();
             ctx.arc(256, 512, 70, 0, Math.PI * 2);
             ctx.stroke();
 
-            // منطقة الجزاء العلوي (المرمى الأول)
             ctx.strokeRect(120, 20, 272, 140);
-            // منطقة الجزاء السفلي (المرمى الثاني)
             ctx.strokeRect(120, 864, 272, 140);
 
             const pitchTexture = new THREE.CanvasTexture(canvasTex);
@@ -337,26 +325,22 @@
             pitch.receiveShadow = true;
             scene.add(pitch);
 
-            // تصميم المرمى (الجون) العلوي والسفلي لشكل واقعي
+            // المرمى
             function createGoal(zPos, rotationY) {
                 const goalGroup = new THREE.Group();
                 const postMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 });
-                
                 const postGeo = new THREE.CylinderGeometry(0.15, 0.15, 4);
                 
-                // القائم الأيمن
                 const post1 = new THREE.Mesh(postGeo, postMat);
                 post1.position.set(4, 2, 0);
                 post1.castShadow = true;
                 goalGroup.add(post1);
 
-                // القائم الأيسر
                 const post2 = new THREE.Mesh(postGeo, postMat);
                 post2.position.set(-4, 2, 0);
                 post2.castShadow = true;
                 goalGroup.add(post2);
 
-                // العارضة العلوية
                 const barGeo = new THREE.CylinderGeometry(0.15, 0.15, 8.3);
                 const bar = new THREE.Mesh(barGeo, postMat);
                 bar.rotation.z = Math.PI / 2;
@@ -372,7 +356,7 @@
             createGoal(-32, 0);
             createGoal(32, 0);
 
-            // اللاعب المجسم
+            // اللاعب
             const playerGeo = new THREE.BoxGeometry(1.2, 2.2, 1.2);
             const playerMat = new THREE.MeshStandardMaterial({ color: 0x00e676, roughness: 0.4, metalness: 0.3 });
             playerMesh = new THREE.Mesh(playerGeo, playerMat);
@@ -384,7 +368,7 @@
             const ballGeo = new THREE.SphereGeometry(0.7, 32, 32);
             const ballMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2, metalness: 0.1 });
             ball = new THREE.Mesh(ballGeo, ballMat);
-            ball.position.set(0, 0.7, 5);
+            ball.position.set(0, 0.7, 2); // تبدأ أمام اللاعب مباشرة
             ball.castShadow = true;
             scene.add(ball);
 
@@ -397,12 +381,33 @@
         function animate() {
             requestAnimationFrame(animate);
             
+            // حركة اللاعب عبر الجويستيك
             if (playerMesh) {
                 playerMesh.position.x += moveX * 0.12;
                 playerMesh.position.z += moveY * 0.12;
+
+                // إذا لم يتم شطت الكرة بعد، تظل ملتصقة أمام اللاعب مباشرة
+                if (!isBallMoving) {
+                    ball.position.x = playerMesh.position.x;
+                    ball.position.z = playerMesh.position.z - 1.2;
+                }
             }
 
-            ball.rotation.y += 0.02;
+            // إذا شوت الكرة تتحرك وتفقد سرعتها بالتدريج
+            if (isBallMoving) {
+                ball.position.x += ballVelocityX;
+                ball.position.z += ballVelocityZ;
+
+                ballVelocityX *= 0.95;
+                ballVelocityZ *= 0.95;
+
+                // لو السرعة أصبحت ضعيفة جداً، تقف الكرة ويمكنك التحكم بها مجدداً
+                if (Math.abs(ballVelocityX) < 0.01 && Math.abs(ballVelocityZ) < 0.01) {
+                    isBallMoving = false;
+                }
+            }
+
+            ball.rotation.y += 0.05;
             renderer.render(scene, camera);
         }
 
@@ -443,9 +448,23 @@
             });
         }
 
-        window.passBall = function() { console.log('تمرير'); };
-        window.shootBall = function() { console.log('تسديد'); };
-        window.slideTackle = function() { console.log('تزحلق'); };
+        // تمرير الكرة للأمام
+        window.passBall = function() {
+            isBallMoving = true;
+            ballVelocityX = moveX * 0.3 || 0;
+            ballVelocityZ = -0.6;
+        };
+
+        // تسديد الكرة بقوة نحو المرمى
+        window.shootBall = function() {
+            isBallMoving = true;
+            ballVelocityX = moveX * 0.8 || 0;
+            ballVelocityZ = -1.5;
+        };
+
+        window.slideTackle = function() {
+            console.log('تزحلق');
+        };
     </script>
 </body>
 </html>
