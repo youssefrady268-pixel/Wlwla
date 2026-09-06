@@ -26,6 +26,7 @@
             box-shadow: 0 20px 40px rgba(0,0,0,0.6);
             max-width: 450px;
             width: 90%;
+            position: relative;
         }
 
         h1 { margin-bottom: 20px; font-size: 28px; color: #00e676; text-shadow: 0 0 15px rgba(0,230,118,0.4); }
@@ -46,6 +47,13 @@
         }
         button:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0,200,83,0.5); }
         
+        .logout-btn {
+            position: absolute; top: 20px; left: 20px; width: auto; padding: 8px 16px;
+            background: rgba(229, 57, 53, 0.2); border: 1px solid #e53935; color: #ff5252;
+            font-size: 13px; border-radius: 8px; margin-top: 0; box-shadow: none;
+        }
+        .logout-btn:hover { background: rgba(229, 57, 53, 0.4); color: #fff; }
+
         #game-screen { background: #000; }
         #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
         
@@ -117,7 +125,8 @@
 
     <div id="lobby-screen" class="screen">
         <div class="card">
-            <h1 id="welcome-msg" style="font-size: 22px;"></h1>
+            <button class="logout-btn" onclick="logout()">تسجيل خروج 🚪</button>
+            <h1 id="welcome-msg" style="font-size: 22px; margin-top: 25px;"></h1>
             <button onclick="createRoom()">إنشاء غرفة جديدة 🎮</button>
             <div style="margin: 15px 0; color: #78909c;">أو انضم لغرفة صديق</div>
             <input type="text" id="room-code-input" placeholder="أدخل كود الغرفة...">
@@ -223,6 +232,14 @@
             showLobby();
         };
 
+        window.logout = function() {
+            localStorage.clear();
+            userData = { name: '', team: '', player: '' };
+            document.getElementById('lobby-screen').classList.remove('active');
+            document.getElementById('login-screen').classList.add('active');
+            document.getElementById('username-input').value = '';
+        };
+
         function showLobby() {
             document.getElementById('login-screen').classList.remove('active');
             document.getElementById('team-screen').classList.remove('active');
@@ -289,7 +306,7 @@
             dirLight.shadow.mapSize.height = 1024;
             scene.add(dirLight);
 
-            // الملعب وتخطيطه
+            // تصميم الملعب وتخطيطه
             const canvasTex = document.createElement('canvas');
             canvasTex.width = 512;
             canvasTex.height = 1024;
@@ -368,7 +385,7 @@
             const ballGeo = new THREE.SphereGeometry(0.7, 32, 32);
             const ballMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2, metalness: 0.1 });
             ball = new THREE.Mesh(ballGeo, ballMat);
-            ball.position.set(0, 0.7, 2); // تبدأ أمام اللاعب مباشرة
+            ball.position.set(0, 0.7, 2);
             ball.castShadow = true;
             scene.add(ball);
 
@@ -381,19 +398,16 @@
         function animate() {
             requestAnimationFrame(animate);
             
-            // حركة اللاعب عبر الجويستيك
             if (playerMesh) {
                 playerMesh.position.x += moveX * 0.12;
                 playerMesh.position.z += moveY * 0.12;
 
-                // إذا لم يتم شطت الكرة بعد، تظل ملتصقة أمام اللاعب مباشرة
                 if (!isBallMoving) {
                     ball.position.x = playerMesh.position.x;
                     ball.position.z = playerMesh.position.z - 1.2;
                 }
             }
 
-            // إذا شوت الكرة تتحرك وتفقد سرعتها بالتدريج
             if (isBallMoving) {
                 ball.position.x += ballVelocityX;
                 ball.position.z += ballVelocityZ;
@@ -401,7 +415,6 @@
                 ballVelocityX *= 0.95;
                 ballVelocityZ *= 0.95;
 
-                // لو السرعة أصبحت ضعيفة جداً، تقف الكرة ويمكنك التحكم بها مجدداً
                 if (Math.abs(ballVelocityX) < 0.01 && Math.abs(ballVelocityZ) < 0.01) {
                     isBallMoving = false;
                 }
@@ -448,14 +461,12 @@
             });
         }
 
-        // تمرير الكرة للأمام
         window.passBall = function() {
             isBallMoving = true;
             ballVelocityX = moveX * 0.3 || 0;
             ballVelocityZ = -0.6;
         };
 
-        // تسديد الكرة بقوة نحو المرمى
         window.shootBall = function() {
             isBallMoving = true;
             ballVelocityX = moveX * 0.8 || 0;
